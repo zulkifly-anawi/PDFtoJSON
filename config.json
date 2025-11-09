@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "Practice Test 1",
+      "questions": "input/questions/Certified_Associate_in_Project_Management_CAPM__2023_Update__Practice_Test_1.pdf",
+      "answers": "input/answers/SAMPLE_QUESTION_PRACTICE_1__Answers_with_Rationale.pdf",
+      "batch_size": 15
+    },
+    {
+      "name": "Practice Test 2",
+      "questions": "input/questions/Certified_Associate_in_Project_Management_CAPM__2023_Update__Practice_Test_2.pdf",
+      "answers": "input/answers/SAMPLE_QUESTION_PRACTICE_2__Answers_with_Rationale.pdf",
+      "batch_size": 15
+    },
+    {
+      "name": "Practice Test 3",
+      "questions": "input/questions/Certified_Associate_in_Project_Management_CAPM__2023_Update__Practice_Test_3.pdf",
+      "answers": "input/answers/SAMPLE_QUESTION_PRACTICE_3__Answers_with_Rationale.pdf",
+      "batch_size": 15
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {
+      "name": "Practice Test 3",
+      "questions": "input/questions/Certified Associate in Project Management (CAPM)  2023 Update  Practice Test (3).pdf",
+      "answers": "input/answers/SAMPLE QUESTION PRACTICE 3  Answers with Rationale.pdf",
+      "batch_size": 15
+    }
+  ]
+}
