@@ -23,3 +23,8 @@ jobs:
         run: |
           cd PDFtoJSON
           pytest -q
+      - name: Run CI validation on combined outputs
+        run: |
+          cd PDFtoJSON
+          python scripts/ci_validate_outputs.py
+        continue-on-error: false
