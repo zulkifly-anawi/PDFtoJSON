@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/PDFtoJSON"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # Optionally allow security updates only; we want regular updates too
+    # ignore: []

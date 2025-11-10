@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -18,8 +20,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r PDFtoJSON/requirements.txt
+          python -m pip install -r requirements.txt
       - name: Run tests
+        run: pytest -q
+      - name: Run CI validation on combined outputs
         run: |
-          cd PDFtoJSON
-          pytest -q
+          python scripts/ci_validate_outputs.py
+        continue-on-error: false
