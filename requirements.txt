@@ -1,6 +1,6 @@
 # Core PDF parsing (choose one; script will lazy-import)
 pdfplumber==0.11.8
-pypdf==6.2.0
+pypdf==6.3.0
 
 # Utilities
 tqdm>=4.66.5
