@@ -126,6 +126,52 @@ The extraction pipeline follows these steps:
 6. **JSON Generation**: Creates batched output files with standardized structure
 7. **Validation**: Performs comprehensive checks on required fields, answer consistency, and explanation quality
 
+## Configuration & Customization
+
+### Extraction Parameters
+
+Fine-tune extraction behavior by editing `extraction_config.py`:
+
+```python
+# Validation thresholds
+MIN_EXPLANATION_LENGTH = 100      # Minimum explanation length in characters
+LONG_QUESTION_THRESHOLD = 200     # Question length for difficulty scoring
+LONG_EXPLANATION_THRESHOLD = 500  # Explanation length for difficulty scoring
+
+# Batch processing
+DEFAULT_BATCH_SIZE = 15           # Questions per batch file
+
+# Difficulty scoring
+DIFFICULTY_EASY_MAX = 1           # Max score for 'easy' (0-1)
+DIFFICULTY_MEDIUM_MAX = 3         # Max score for 'medium' (2-3)
+# Scores 4+ are classified as 'hard'
+```
+
+### Topic Classification
+
+Customize keyword lists for better classification accuracy:
+
+- **Agile keywords**: scrum, sprint, kanban, retrospective, etc.
+- **Predictive keywords**: waterfall, wbs, gantt, critical path, etc.
+- **Business Analysis keywords**: requirements, business case, roi, swot, etc.
+
+Edit keyword lists in `extraction_config.py` to match your content.
+
+### Advanced Options
+
+**Strict path mode** (skip tests with missing PDFs):
+```bash
+python scripts/extract_questions.py --config config.json --strict-paths
+```
+
+**Skip quick tests** (faster execution):
+```bash
+python scripts/extract_questions.py --config config.json --skip-tests
+```
+
+**Custom batch size** (override config.json):
+Edit `batch_size` value in your config file for each test.
+
 ## Technical Stack
 
 - **Python 3.9+**: Core language
@@ -251,6 +297,69 @@ The repository includes GitHub Actions workflow (`.github/workflows/ci.yml`) tha
 - Triggers on push and pull requests
 
 Dependabot is configured for weekly dependency updates.
+
+## Troubleshooting
+
+### Common Issues
+
+**"No files matched pattern" error:**
+- **Cause**: No batch files found for the specified test name
+- **Solution**: Check that extraction ran successfully and output files exist in `output/` directory
+- **Verify**: `ls output/CAPM_*_Questions_*.json`
+
+**"Explanation too short" warnings:**
+- **Cause**: Source PDFs have terse rationale (<100 chars) for some questions
+- **Solution**: This is a warning, not an error. Items are still included in output
+- **Fix**: Adjust `MIN_EXPLANATION_LENGTH` in `extraction_config.py` if needed
+
+**Missing questions in output:**
+- **Cause**: Batching by count instead of question number ranges
+- **Solution**: The code already handles this correctly (batches by number ranges)
+- **Verify**: Check that all 150 questions are present in combined output
+
+**Import errors in CI:**
+- **Cause**: `scripts` module not in PYTHONPATH
+- **Solution**: GitHub Actions workflow sets `PYTHONPATH: ${{ github.workspace }}`
+- **Local fix**: Run tests with `PYTHONPATH=. pytest -q`
+
+**PDF parsing fails:**
+- **Cause**: pdfplumber cannot parse specific PDF format
+- **Solution**: Script automatically falls back to pypdf
+- **Manual**: Check PDF isn't corrupted or password-protected
+
+**Answer letter not in options:**
+- **Cause**: Mismatch between extracted answer and question options
+- **Solution**: Review source PDFs for OCR errors or formatting issues
+- **Log**: Check extraction output for specific question numbers
+
+### Validation Failures
+
+The validation step checks for:
+1. ✓ All required fields present and non-empty
+2. ✓ Text starts with `[Practice Test X]`
+3. ✓ Answer letters exist in question options
+4. ⚠️ Explanation length >= 100 characters (warning only)
+5. ✓ Topic is one of 4 valid CAPM domains
+6. ✓ Difficulty is 'easy', 'medium', or 'hard'
+
+**To adjust validation**:
+- Edit thresholds in `extraction_config.py`
+- Modify `validate_json_output()` function in `extract_questions.py`
+
+### Debug Mode
+
+For verbose output during extraction:
+```bash
+# Add debug logging (future enhancement)
+# Currently use print statements in code for debugging
+```
+
+### Getting Help
+
+1. Check GitHub Issues for similar problems
+2. Review `openspec/project.md` for project context
+3. Consult `.github/copilot-instructions.md` for code patterns
+4. Run validation: `python scripts/ci_validate_outputs.py`
 
 ## Notes
 

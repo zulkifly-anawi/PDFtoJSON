@@ -8,9 +8,22 @@ from typing import List, Dict, Any, Iterable
 
 
 def combine_batches(test_name: str, output_dir: str = "output") -> str:
-    """Combine batch JSONs for given test into a single JSON file.
-
-    Returns the path to the combined JSON file.
+    """Combine batch JSONs for a single test into one consolidated file.
+    
+    Args:
+        test_name: Name of the test (e.g., 'Practice Test 2')
+        output_dir: Directory containing batch JSON files (default: 'output')
+        
+    Returns:
+        Path to the combined JSON file
+        
+    Raises:
+        FileNotFoundError: If no batch files found for the test
+        ValueError: If JSON file has unexpected structure
+        
+    Example:
+        >>> combine_batches('Practice Test 2')
+        'output/CAPM_Practice_Test_2_All.json'
     """
     prefix = f"CAPM_{test_name.replace(' ', '_')}_Questions_"
     pattern = os.path.join(output_dir, f"{prefix}*.json")
@@ -44,10 +57,20 @@ def combine_batches(test_name: str, output_dir: str = "output") -> str:
 
 
 def detect_tests_in_output(output_dir: str = "output") -> List[str]:
-    """Auto-detect test names based on existing batch files in output/.
-
-    Looks for files like: CAPM_<TEST_NAME_WITH_UNDERSCORES>_Questions_*.json
-    Returns a de-underscored list of test names (with spaces).
+    """Auto-detect test names from existing batch files in output directory.
+    
+    Scans for files matching pattern: CAPM_<TEST_NAME>_Questions_*.json
+    and extracts unique test names with underscores replaced by spaces.
+    
+    Args:
+        output_dir: Directory to scan for batch files (default: 'output')
+        
+    Returns:
+        Sorted list of test names with spaces (e.g., ['Practice Test 1', 'Practice Test 2'])
+        
+    Example:
+        >>> detect_tests_in_output()
+        ['Practice Test 2', 'Practice Test 3']
     """
     paths = glob.glob(os.path.join(output_dir, "CAPM_*_Questions_*.json"))
     names = set()

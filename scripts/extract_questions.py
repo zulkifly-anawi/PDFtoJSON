@@ -22,30 +22,42 @@ from typing import Dict, List, Any, Optional, Tuple
 
 # Note: PDF libraries are imported lazily inside functions to avoid hard dependency for dry runs.
 
+# Constants
+DEFAULT_BATCH_SIZE = 15
+MIN_EXPLANATION_LENGTH = 100
+LONG_QUESTION_THRESHOLD = 200
+LONG_EXPLANATION_THRESHOLD = 500
+
+VALID_TOPICS = [
+    "Project Management Fundamentals and Core Concepts",
+    "Predictive, Plan-Based Methodologies",
+    "Agile Frameworks/Methodologies",
+    "Business Analysis Frameworks",
+]
+
 
 def extract_questions(pdf_path: str) -> List[Dict[str, Any]]:
     """
-    Extract questions from PDF maintaining:
-    1. Question number
-    2. Full question text (handle multi-line)
-    3. All options (A, B, C, D, sometimes E, F, G)
-    4. Handle special formatting (bold, newlines)
-
-    Returns a list of question dicts:
-    {
-      'number': int,
-      'text': str,
-      'options': { 'A': str, 'B': str, ... }
-    }
-
-    Implementation notes (to be completed):
-    - Use pdfplumber or pypdf to extract text per page
-    - Detect question blocks via regex
-      * Question: r"^(\d+)\s*\)\s*(.*)" (number followed by close paren)
-      * Options: r"^([A-G])\)\s*(.+)"
-    - Accumulate multi-line question text until first option
-    - Continue collecting options until next question starts or block ends
-    - Preserve special characters and normalize whitespace carefully
+    Extract questions from PDF maintaining question numbers, text, and options.
+    
+    Handles multi-line questions, indented options with various delimiters,
+    duplicate page numbers, and page footer artifacts.
+    
+    Args:
+        pdf_path: Absolute path to the questions PDF file
+        
+    Returns:
+        List of question dictionaries, each containing:
+            - number (int): Question number
+            - text (str): Full question text
+            - options (dict): Option letters mapped to option text
+            - requires_manual_review (bool, optional): Flag for images/interactive
+            - choose_multi (bool, optional): Flag for multi-select questions
+            
+    Example:
+        >>> questions = extract_questions('input/questions/test.pdf')
+        >>> questions[0]
+        {'number': 1, 'text': 'What is...?', 'options': {'A': '...', 'B': '...'}}
     """
     # Attempt to read PDF and produce structured questions list.
     # Safe behavior: if file missing or parser unavailable, return [].
@@ -178,24 +190,23 @@ def extract_questions(pdf_path: str) -> List[Dict[str, Any]]:
 
 def extract_answers(pdf_path: str) -> Dict[int, Dict[str, str]]:
     """
-    Extract answers and match to question numbers.
-
-    Pattern: NUMBER LETTER(s) Explanation text...
-
-    Handle:
-    1. Single answers: "51 C"
-    2. Multiple answers: "56 A,B,C" or "62 A,E"
-    3. Multi-line explanations
-    4. References to PMBOK/Agile Practice Guide
-
-    Returns a dict keyed by question number:
-    { 51: { 'correct': 'C', 'explanation': '...' }, ... }
-
-    Implementation notes (to be completed):
-    - Use pdfplumber or pypdf
-    - Regex root: r"^(\d+)\s+([A-G,]+)\s+(.+)" (explanation continues to next match)
-    - Merge lines until next question number
-    - Clean CRLF and normalize quotes
+    Extract answers and explanations from PDF, matching to question numbers.
+    
+    Handles single/multiple answers, multi-line explanations, standalone answer
+    headers, and various delimiter formats.
+    
+    Args:
+        pdf_path: Absolute path to the answers PDF file
+        
+    Returns:
+        Dictionary keyed by question number containing:
+            - correct (str): Answer letter(s), comma-separated for multi-select
+            - explanation (str): Full explanation text with rationale
+            
+    Example:
+        >>> answers = extract_answers('input/answers/rationale.pdf')
+        >>> answers[1]
+        {'correct': 'C', 'explanation': 'The correct answer is C because...'}
     """
     if not os.path.exists(pdf_path):
         print(f"(extract_answers) File not found: {pdf_path}")
@@ -283,12 +294,22 @@ def match_questions_answers(
     questions: List[Dict[str, Any]], answers: Dict[int, Dict[str, str]]
 ) -> List[Dict[str, Any]]:
     """
-    Combine extracted questions with their answers.
-
-    Validate:
-    - Every question has an answer
-    - Answer letter exists in question options
-    - Flag mismatches for review
+    Combine extracted questions with their corresponding answers.
+    
+    Validates answer letters exist in question options and logs warnings
+    for missing answers.
+    
+    Args:
+        questions: List of question dictionaries from extract_questions()
+        answers: Dictionary of answers keyed by question number
+        
+    Returns:
+        List of matched items, each containing 'question' and 'answer' dicts
+        
+    Example:
+        >>> matched = match_questions_answers(questions, answers)
+        >>> matched[0]
+        {'question': {...}, 'answer': {'correct': 'C', 'explanation': '...'}}
     """
     matched_data: List[Dict[str, Any]] = []
 
@@ -314,12 +335,20 @@ def match_questions_answers(
 
 def classify_topic(item: Dict[str, Any]) -> str:
     """
-    Classify question into CAPM ECO domains based on keywords.
-    Returns one of:
-    - Project Management Fundamentals and Core Concepts
-    - Predictive, Plan-Based Methodologies
-    - Agile Frameworks/Methodologies
-    - Business Analysis Frameworks
+    Classify question into one of 4 CAPM ECO domains using keyword analysis.
+    
+    Analyzes both question text and explanation for domain-specific keywords,
+    checking in order of specificity (Agile → Predictive → BA → Fundamentals).
+    
+    Args:
+        item: Matched item dict containing 'question' and 'answer' keys
+        
+    Returns:
+        One of the 4 valid CAPM ECO domain strings (see VALID_TOPICS constant)
+        
+    Example:
+        >>> classify_topic({'question': {'text': 'What is a sprint?'}, 'answer': {'explanation': '...'}})
+        'Agile Frameworks/Methodologies'
     """
     question_text = item["question"]["text"].lower()
     explanation = item["answer"].get("explanation", "").lower()
@@ -355,20 +384,32 @@ def classify_topic(item: Dict[str, Any]) -> str:
 
 def estimate_difficulty(item: Dict[str, Any]) -> str:
     """
-    Estimate difficulty based on:
-    1. Question complexity
-    2. Explanation length
-    3. Number of options
-    4. Keywords indicating complexity
+    Estimate question difficulty using heuristic scoring.
+    
+    Scoring factors:
+    - Question length (>200 chars: +1)
+    - Explanation length (>500 chars: +1)
+    - Multi-answer questions (+2)
+    - Complex keywords ('root cause', 'best practice', etc.: +1)
+    
+    Args:
+        item: Matched item dict containing 'question' and 'answer' keys
+        
+    Returns:
+        Difficulty level: 'easy' (0-1), 'medium' (2-3), or 'hard' (4+)
+        
+    Example:
+        >>> estimate_difficulty(item_with_long_multi_answer)
+        'hard'
     """
     q_text = item["question"]["text"]
     explanation = item["answer"].get("explanation", "")
 
     difficulty_score = 0
 
-    if len(q_text) > 200:
+    if len(q_text) > LONG_QUESTION_THRESHOLD:
         difficulty_score += 1
-    if len(explanation) > 500:
+    if len(explanation) > LONG_EXPLANATION_THRESHOLD:
         difficulty_score += 1
 
     if "," in item["answer"].get("correct", ""):
@@ -433,15 +474,9 @@ def validate_json_output(json_file: str) -> bool:
         for letter in [l.strip() for l in answer.split(',') if l.strip()]:
             if letter not in item.get('options', {}):
                 issues.append(f"Q{q_num}: Answer {letter} not in options")
-        if len(item.get('explanation', '')) < 100:
-            issues.append(f"Q{q_num}: Explanation too short")
-        valid_topics = [
-            "Project Management Fundamentals and Core Concepts",
-            "Predictive, Plan-Based Methodologies",
-            "Agile Frameworks/Methodologies",
-            "Business Analysis Frameworks",
-        ]
-        if item.get('topic') not in valid_topics:
+        if len(item.get('explanation', '')) < MIN_EXPLANATION_LENGTH:
+            issues.append(f"Q{q_num}: Explanation too short (< {MIN_EXPLANATION_LENGTH} chars)")
+        if item.get('topic') not in VALID_TOPICS:
             issues.append(f"Q{q_num}: Invalid topic '{item.get('topic')}'")
         if item.get('difficulty') not in ['easy', 'medium', 'hard']:
             issues.append(f"Q{q_num}: Invalid difficulty '{item.get('difficulty')}'")
